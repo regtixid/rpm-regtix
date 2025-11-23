@@ -76,33 +76,65 @@ class RegistrationController extends Controller
             $registration = Registration::create($data);
 
             $code = $data['voucher_code'] ?? null;
+
             if ($code) {
-                VoucherCode::where('code', $code)
-                    ->whereDoesntHave('registration')
-                    ->where('used', false)
-                    ->update(['registration_id' => $registration->id]);
+                // Ambil voucher
+                $voucherCode = VoucherCode::where('code', $code)->with('voucher')->first();
+
+                if (!$voucherCode) {
+                    throw new \Exception("Voucher code not found");
+                }
+
+                $voucher = $voucherCode->voucher;
+                // Validasi single-use
+                if (!$voucher->is_multiple_use) {
+                    if ($voucherCode->used || $voucherCode->registration) {
+                        throw new \Exception("Voucher code already used");
+                    }
+                }
+
+                // Assign voucher ke registration
+                $registration->voucher_code_id = $voucherCode->id;
+                $registration->save();
             }
 
 
             $ticketType = $registration->categoryTicketType->ticketType;
             $categoryTicketType = $registration->categoryTicketType;
-            $regData = $registration->toArray();
-            $voucher = $registration->voucherCode->voucher ?? null;
-            $priceReduction = $voucher ? $categoryTicketType->price * ($voucher->discount / 100) : 0;
 
+            // Ambil data voucher dan voucher code
+            $voucherCode = $registration->voucherCode;
+            $voucher = $voucherCode ? $voucherCode->voucher : null;
+
+            Log::info('Voucher Code: ' . $voucherCode);
+            Log::info('Voucher: ' . $voucher);
+
+            // Cek apakah voucher valid
+            $voucherValid = $voucherCode && $voucher && ($voucher->is_multiple_use || !$voucherCode->used);
+
+            Log::info('Voucher valid: ' . ($voucherValid ? 'Yes' : 'No'));
+
+            // Tentukan final price
+            $finalPrice = $voucherValid
+                ? floatval($voucher->final_price)   // harga yang harus dibayar (bisa 0 jika gratis)
+                : floatval($categoryTicketType->price); // harga normal tiket
+
+            Log::info('Calculated final price: ' . $finalPrice);
+
+            // Data registrasi
             $regData = $registration->makeHidden('category_ticket_type')->toArray();
 
-            $regData['category'] = $registration->categoryTicketType->category->toArray();
+            // Category & Event
+            $regData['category'] = $categoryTicketType->category->toArray();
             $regData['category']['event'] = $event->toArray();
-            $regData['voucher_code'] = $registration->voucherCode ? [
-                ...$registration->voucherCode->toArray(),
-                'voucher' => $voucher ? [
-                    'id' => $voucher->id,
-                    'name' => $voucher->name,
-                    'discount' => $voucher->discount,
-                ] : null,
+
+            // Voucher info
+            $regData['voucher_code'] = $voucherCode ? [
+                ...$voucherCode->toArray(),
+                'valid' => $voucherValid,
             ] : null;
-            $finalPrice = $categoryTicketType->price - $priceReduction;
+
+            // Ticket type info
             $regData['ticket_type'] = [
                 'name' => $ticketType->name,
                 'price' => $categoryTicketType->price,
@@ -111,10 +143,18 @@ class RegistrationController extends Controller
                 'remaining' => $categoryTicketType->quota - $categoryTicketType->registrations_count,
                 'valid_from' => $categoryTicketType->valid_from,
                 'valid_until' => $categoryTicketType->valid_until,
-                'final_price' => $finalPrice,
+                'final_price' => $finalPrice, // harga yang harus dibayar
             ];
 
-            $shouldPay = $finalPrice > 0;
+            if ($voucherValid) {
+                if (!$voucher->is_multiple_use) {
+                    // Tandai voucher single-use sebagai used
+                    $voucherCode->used = true;
+                    $voucherCode->save();
+                }
+            }
+            Log::info('Final price: ' . $finalPrice);
+            $shouldPay = floatval($finalPrice) > 0;
             if ($shouldPay) {
                 $midtrans = new MidtransUtils();
                 $paymment = $midtrans->generatePaymentLink($registration, $event);
@@ -123,7 +163,7 @@ class RegistrationController extends Controller
 
                 $registration->update(['payment_url' => $paymment['payment_url']]);
                 $template = file_get_contents(resource_path('email/templates/payment-instruction.html'));
-                $subject = '[' . $event->name . ']' . ' Pendaftaran Anda Berhasil! - Do Not Reply';
+                $subject = '[' . $event->name . ']' . ' Tagihan Pembayaran - Do Not Reply';
             } else {
                 $subject = $registration->categoryTicketType->category->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
                 $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
@@ -143,12 +183,6 @@ class RegistrationController extends Controller
                     'gross_amount' => 0,
                     'qr_code_path' => $qrPath,
                 ]);
-
-                if ($registration->voucherCode) {
-                    $registration->voucherCode->update([
-                        'used' => true
-                    ]);
-                }
             }
             $email = new EmailSender();
             $email->sendEmail($registration, $subject, $template);

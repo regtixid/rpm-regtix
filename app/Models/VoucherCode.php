@@ -13,7 +13,6 @@ class VoucherCode extends Model
         'voucher_id',
         'code',
         'used',
-        'registration_id'
     ];
 
     public function voucher()
@@ -23,6 +22,12 @@ class VoucherCode extends Model
 
     public function registration()
     {
-        return $this->belongsTo(Registration::class);
+        // SINGLE USE
+        return $this->hasOne(Registration::class, 'voucher_code_id');
+    }
+    public function registrations()
+    {
+        // MULTI USE
+        return $this->hasMany(Registration::class, 'voucher_code_id');
     }
 }

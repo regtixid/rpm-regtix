@@ -71,6 +71,12 @@ class RegistrationResource extends Resource
                 )
                 ->searchable()
                 ->preload(),
+            Select::make('voucher_code_id')
+                ->label('Voucher Code')
+                ->relationship('voucherCode', 'code')
+                ->searchable()
+                ->preload()
+                ->placeholder('Select a Voucher Code'),
             TextInput::make('registration_code')
                 ->label('Registration Code')
                 ->readOnly(),
@@ -191,6 +197,18 @@ class RegistrationResource extends Resource
                     ->sortable()
                     ->searchable()
                     ->dateTime(),
+                TextColumn::make('payment_status')
+                    ->label('Payment Status')
+                    ->badge()
+                    ->icon(fn($record) => $record->payment_status === 'paid' ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+                    ->formatStateUsing(fn(string $state) => $state === 'paid' ? 'Paid' : 'Unpaid')
+                    ->color(fn($record) => $record->payment_status === 'paid' ? 'success' : 'danger')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('voucherCode.code')
+                    ->label('Voucher Code')
+                    ->sortable()
+                    ->searchable(),
             TextColumn::make('registration_code')
                 ->label('Registration Code')
                 ->sortable()

@@ -16,8 +16,15 @@ class MidtransUtils
 
         $voucher = $registration->voucherCode->voucher ?? null;
         $categoryTicketType = $registration->categoryTicketType;
-        $priceReduction = $voucher ? $categoryTicketType->price * ($voucher->discount / 100) : 0;
-        $finalPrice = $categoryTicketType->price - $priceReduction;
+
+        if ($voucher) {
+            $finalPrice = $voucher->final_price;
+            $priceReduction = $categoryTicketType->price - $voucher->final_price;
+        } else {
+            $finalPrice = $categoryTicketType->price;
+            $priceReduction = 0;
+        }
+
         $address = $registration->address . ', ' . $registration->district . ', ' . $registration->province;
 
         $itemDetails = [

@@ -8,9 +8,11 @@ use App\Models\CategoryTicketType;
 use App\Models\Voucher;
 use Filament\Tables\Actions\Action;
 use Filament\Forms;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
@@ -70,8 +72,8 @@ class VoucherResource extends Resource
                 ->searchable()
                 ->preload()
                 ->required(),
-            TextInput::make('discount')
-                ->label('Discount (e.g. 50)')
+            TextInput::make('final_price')
+                ->label('Final Price (e.g. 100.000)')
                 ->numeric()
                 ->required()
         ]);
@@ -84,13 +86,11 @@ class VoucherResource extends Resource
                 TextColumn::make('name')->searchable(),
                 TextColumn::make('categoryTicketType.category.name')->label('Category'),
                 TextColumn::make('categoryTicketType.ticketType.name')->label('Ticket Type'),
-                TextColumn::make('discount')
-                ->formatStateUsing(fn($state) => $state . '%'),
+                TextColumn::make('final_price')->label('Final Price')
+                ->formatStateUsing(fn($state) => 'Rp. ' . number_format($state, 0, ',', '.')),
                 TextColumn::make('voucher_codes_count')
                 ->label('Codes')
                 ->counts('voucherCodes'),
-
-                
             ])
             ->filters([])
             ->actions([
@@ -103,20 +103,52 @@ class VoucherResource extends Resource
             Action::make('generate')
                 ->label('Generate Codes')
                 ->icon('heroicon-o-key')
+                ->modalWidth('sm')
                 ->form([
+                    Checkbox::make('is_multiple_use')
+                        ->label('Multiple Use')
+                        ->reactive()
+                        ->default(false),
+                    TextInput::make('voucher_code')
+                        ->label('Input Voucher Code')
+                        ->visible(fn (callable $get) => $get('is_multiple_use')),
+
                     TextInput::make('quantity')
                         ->label('Code Quantity')
                         ->numeric()
                         ->minValue(1)
                         ->default(1)
-                        ->required(),
+                        ->required()
+                        ->visible(fn (callable $get) => ! $get('is_multiple_use')),
                 ])
                 ->action(function ($record, array $data) {
-                    for ($i = 0; $i < (int) $data['quantity']; $i++) {
+                    if(!empty($data['is_multiple_use'])) {
+                        $code = strtoupper($data['voucher_code']);
+                        if ($record->voucherCodes()->where('code', $code)->exists()) {
+                            Notification::make()
+                                ->title('Voucher Code Exists')
+                                ->danger()
+                                ->body("Voucher Code {$code} already exists.")
+                                ->send();
+                            return;
+                        }
+
                         $record->voucherCodes()->create([
-                            'code' => strtoupper(Str::random(10)),
+                            'code' => $data['voucher_code'],
+                            'is_multiple_use' => true
                         ]);
+                    } else {
+                        for ($i = 0; $i < (int) $data['quantity']; $i++) {
+                            $record->voucherCodes()->create([
+                                'code' => strtoupper(Str::random(10)),
+                                'is_multiple_use' => false
+                            ]);
+                        }
                     }
+                     Notification::make()
+                        ->title('Voucher codes generated!')
+                        ->success()
+                        ->send();
                 }),         
             ])
             ->bulkActions([

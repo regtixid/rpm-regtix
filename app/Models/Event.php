@@ -16,6 +16,12 @@ class Event extends Model
         'TC' => 'TEMPORARY CLOSED'
     ];
 
+    const SIZE = [
+        'Large' => 'Large',
+        'Medium' => 'Medium',
+        'Small' => 'Small'
+    ];
+
     public $fillable = [
         'name',
         'start_date',
@@ -40,8 +46,10 @@ class Event extends Model
         'event_organizer',
         'event_logo',
         'event_banner',
+        'jersey_size_image',
         'slug',
-        'status'
+        'status',
+        'size'
     ];
 
 
@@ -65,30 +73,54 @@ class Event extends Model
         return $this->belongsToMany(User::class);
     }
 
+    public function slides(){
+        return $this->hasMany(EventSlide::class);
+    }
+
     protected static function booted()
     {
         static::created(function ($event) {
-            $oldLogoPath = $event->event_logo;
-            $oldBannerPath = $event->event_banner;
+            // Pindah logo, banner, jersey
+            foreach ([
+                'event_logo' => 'image/event/logo',
+                'event_banner' => 'image/event/banner',
+                'jersey_size_image' => 'image/event/jersey-size',
+            ] as $column => $folder) {
+                $oldPath = $event->{$column};
+                if (!empty($oldPath) && is_string($oldPath)) {
+                    $newPath = "{$folder}/{$event->id}/" . basename($oldPath);
 
-            if (!empty($oldLogoPath) && is_string($oldLogoPath)) {
-                $newLogoPath = "image/event/logo/{$event->id}/" . basename($oldLogoPath);
-
-                if (Storage::disk('public')->exists($oldLogoPath)) {
-                    Storage::disk('public')->move($oldLogoPath, $newLogoPath);
-                    $event->updateQuietly(['event_logo' => $newLogoPath]);
-                }
-            }
-
-            if (!empty($oldBannerPath) && is_string($oldBannerPath)) {
-                $newBannerPath = "image/event/banner/{$event->id}/" . basename($oldBannerPath);
-
-                if (Storage::disk('public')->exists($oldBannerPath)) {
-                    Storage::disk('public')->move($oldBannerPath, $newBannerPath);
-                    $event->updateQuietly(['event_banner' => $newBannerPath]);
+                    if (Storage::disk('public')->exists($oldPath)) {
+                        Storage::disk('public')->move($oldPath, $newPath);
+                        $event->updateQuietly([$column => $newPath]);
+                    }
                 }
             }
         });
+
+
+        // static::saved(function ($event) {
+        //     if ($event->slides()->exists()) {
+        //         foreach ($event->slides as $slide) {
+        //             $oldSlidePath = $slide->image_path;
+
+        //             // Lewati jika sudah di folder final
+        //             if (str_starts_with($oldSlidePath, "image/event/slides/{$event->id}/")) {
+        //                 continue;
+        //             }
+
+        //             if (!empty($oldSlidePath) && is_string($oldSlidePath)) {
+        //                 $newSlidePath = "image/event/slides/{$event->id}/" . basename($oldSlidePath);
+
+        //                 if (Storage::disk('public')->exists($oldSlidePath)) {
+        //                     Storage::disk('public')->move($oldSlidePath, $newSlidePath);
+        //                     $slide->updateQuietly(['image_path' => $newSlidePath]);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // });
+
     }
 
     protected static function boot()

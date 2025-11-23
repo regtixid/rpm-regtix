@@ -86,10 +86,14 @@ class MidtransWebhookController extends Controller
                 'gross_amount' => $grossAmount,
                 'qr_code_path' => $qrPath,
             ]);
-            $emailSender = new EmailSender();
-            $subject = $registration->categoryTicketType->category->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
-            $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
-            $emailSender->sendEmail($registration, $subject, $template);
+
+            if($status === 'paid'){
+                $emailSender = new EmailSender();
+                $subject = $registration->categoryTicketType->category->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
+                $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
+                $emailSender->sendEmail($registration, $subject, $template);
+            }
+            
             if ($registration->voucherCode) {
                 $registration->voucherCode->update([
                     'used' => true

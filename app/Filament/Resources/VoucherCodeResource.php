@@ -52,7 +52,7 @@ class VoucherCodeResource extends Resource
             ])
             ->filters([
                 // Filter berdasarkan voucher_id jika ada
-               
+
             ]);
     }
 
