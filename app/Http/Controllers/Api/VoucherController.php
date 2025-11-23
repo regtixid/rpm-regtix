@@ -18,10 +18,19 @@ class VoucherController extends Controller
 
 
         $voucherCode = VoucherCode::with(['voucher.categoryTicketType.ticketType'])
-            ->where(['code' => $request->code, 'used' => false])
+            ->where('code', $request->code)
+            ->where(function ($q) {
+                $q->where('used', false)
+                ->orWhereHas('voucher', function ($v) {
+                    $v->where('is_multiple_use', true);
+                });
+            })
             ->whereHas('voucher.categoryTicketType', function ($query) use ($request) {
                 $query->where('id', $request->category_ticket_type_id);
-            })->whereDoesntHave('registration')
+            })
+            ->whereHas('voucher', function ($q) {
+                $q->where('is_multiple_use', false);
+            })
             ->first();
 
         if (!$voucherCode) {

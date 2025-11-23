@@ -13,8 +13,12 @@ class VoucherCodeCheckResource extends JsonResource
         $ticketType = $voucher?->categoryTicketType->ticketType;
         $categoryTicketType = $voucher?->categoryTicketType;
         $isUsed = (bool) $this->used;
-        $priceReduction = $categoryTicketType->price * ($voucher->discount / 100);
-        $finalPrice = $categoryTicketType->price - $priceReduction;
+        if ($voucher) {
+            $finalPrice = $voucher->final_price;
+        } else {
+            $finalPrice = $categoryTicketType->price;
+        }
+
 
         $categoryTicketTypeWithCount = CategoryTicketType::withCount('registrations')->find($categoryTicketType->id);
         $used = $categoryTicketTypeWithCount?->registrations_count ?? 0;
@@ -25,7 +29,7 @@ class VoucherCodeCheckResource extends JsonResource
             'voucher' => [
                 'id' => $voucher?->id,
                 'name' => $voucher?->name,
-                'discount' => $voucher?->discount,
+                'final_price' => $voucher?->final_price,
             ],
 
             'ticket_type' => $ticketType ? [
