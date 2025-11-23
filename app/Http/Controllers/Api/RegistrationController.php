@@ -174,12 +174,13 @@ class RegistrationController extends Controller
                 $qrGenerator = new QrUtils();
                 $regId = $regIdGenerator->generateRegId($count);
                 $qrPath = $qrGenerator->generateQr($registration);
+                $regData['payment_url'] = "https://regtix.id/payment/finish/{$registration->registration_code}";
                 $registration->update([
                     'status' => 'confirmed',
                     'payment_status' => 'paid',
                     'reg_id' => $regId,
                     'paid_at' => Carbon::now()->format('Y-m-d H:i:s'),
-                    'payment_type' => Carbon::now()->format('Y-m-d H:i:s'),
+                    'payment_type' => '',
                     'gross_amount' => 0,
                     'qr_code_path' => $qrPath,
                 ]);
