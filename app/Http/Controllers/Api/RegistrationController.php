@@ -8,40 +8,41 @@ use App\Helpers\MidtransUtils;
 use App\Helpers\QrUtils;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRegistrationRequest;
-use App\Http\Resources\RegistrationResource;
+use App\Models\CategoryTicketType;
 use App\Models\Event;
 use App\Models\Registration;
-use App\Models\Voucher;
 use App\Models\VoucherCode;
 use Carbon\Carbon;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class RegistrationController extends Controller
 {
     public function store(StoreRegistrationRequest $request)
     {
-
         try {
             $data = $request->validated();
             $event = Event::find($data['event_id']);
-
 
             if (!$event) {
                 return response()->json(['message' => 'Event not found.'], 404);
             }
 
+            // ==== CEK REGISTRATION DUPLIKAT ====
             $registran = Registration::where('email', $data['email'])
                 ->where('category_ticket_type_id', $data['category_ticket_type_id'])
                 ->where('id_card_number', $data['id_card_number'])
                 ->where('status', 'pending')
-                ->with(['categoryTicketType.ticketType', 'categoryTicketType.category', 'categoryTicketType.category.event', 'voucherCode.voucher'])
+                ->with([
+                    'categoryTicketType.ticketType',
+                    'categoryTicketType.category',
+                    'categoryTicketType.category.event',
+                    'voucherCode.voucher'
+                ])
                 ->first();
 
             if ($registran) {
-                $data = [
+                $dataResponse = [
                     ...$registran->toArray(),
                     'category_ticket_type' => [
                         ...$registran->categoryTicketType->toArray(),
@@ -60,99 +61,87 @@ class RegistrationController extends Controller
                 ];
                 return response()->json([
                     'message' => 'Registration already exists.',
-                    'data' => $data
+                    'data' => $dataResponse
                 ], 409);
             }
-            $prefix = $event->code_prefix;
-            // Generate registration ID
-            $data['registration_code'] = 'RTIX-' . $prefix . '-' . strtoupper(Str::random(6));
+
+            // ==== VALIDASI VOUCHER SEBELUM CREATE REGISTRATION ====
+            $voucherCode = null;
+            $voucher = null;
+            $voucherValid = false;
+            $finalPrice = 0;
+
+            if (!empty($data['voucher_code'])) {
+                $voucherCode = VoucherCode::where('code', $data['voucher_code'])
+                    ->with('voucher')
+                    ->first();
+
+                if (!$voucherCode) {
+                    return response()->json(['message' => 'Voucher code not found.'], 404);
+                }
+
+                $voucher = $voucherCode->voucher;
+
+                if (!$voucher) {
+                    return response()->json(['message' => 'Voucher data invalid.'], 404);
+                }
+
+                // ==== Hitung penggunaan voucher sebelum registration dibuat ====
+                $usedCount = $voucherCode->registrations()->count();
+
+                if ($voucher->is_multiple_use) {
+                    $voucherValid = $usedCount < $voucher->max_usage;
+                } else {
+                    $voucherValid = !$voucherCode->used && !$voucherCode->registration;
+                }
+
+                if (!$voucherValid) {
+                    return response()->json(['message' => 'Voucher code already used or expired.'], 400);
+                }
+            }
+
+            // ==== Hitung harga final SEBELUM registration dibuat ====
+            $categoryTicketType = CategoryTicketType::find($data['category_ticket_type_id']);
+            $ticketType = $categoryTicketType->ticketType;
+
+            if ($voucherValid) {
+                $finalPrice = floatval($voucher->final_price);
+            } else {
+                $finalPrice = floatval($categoryTicketType->price);
+            }
+
+            // ==== CREATE REGISTRATION ====
+            $data['registration_code'] = 'RTIX-' . $event->code_prefix . '-' . strtoupper(Str::random(6));
             $data['registration_date'] = Carbon::now();
             $data['status'] = 'pending';
             $data['payment_status'] = 'pending';
             $data['reg_id'] = "";
 
-
-
             $registration = Registration::create($data);
 
-            $code = $data['voucher_code'] ?? null;
-
-            if ($code) {
-                // Ambil voucher
-                $voucherCode = VoucherCode::where('code', $code)->with('voucher')->first();
-
-                if (!$voucherCode) {
-                    throw new \Exception("Voucher code not found");
-                }
-
-                $voucher = $voucherCode->voucher;
-                // Validasi single-use
-                if (!$voucher->is_multiple_use) {
-                    // Single-use: cek sudah digunakan
-                    if ($voucherCode->used || $voucherCode->registration) {
-                        throw new \Exception("Voucher code already used");
-                    }
-                } else {
-                    // Multiple-use: cek sisa penggunaan
-                    $usedCount = $voucherCode->registrations()->count();
-                    if ($usedCount >= $voucher->max_usage) {
-                        throw new \Exception("Voucher code usage limit reached");
-                    }
-                }
-
-                // Assign voucher ke registration
+            // Assign voucher ke registration (setelah semua valid)
+            if ($voucherValid && $voucherCode) {
                 $registration->voucher_code_id = $voucherCode->id;
                 $registration->save();
-            }
 
-
-            $ticketType = $registration->categoryTicketType->ticketType;
-            $categoryTicketType = $registration->categoryTicketType;
-
-            // Ambil data voucher dan voucher code
-            $voucherCode = $registration->voucherCode;
-            $voucher = $voucherCode ? $voucherCode->voucher : null;
-
-            Log::info('Voucher Code: ' . $voucherCode);
-            Log::info('Voucher: ' . $voucher);
-
-            // Cek apakah voucher valid
-            $voucherValid = false;
-
-            if ($voucherCode && $voucher) {
-                if ($voucher->is_multiple_use) {
-                    // Multiple-use: cek sisa penggunaan
-                    $usedCount = $voucherCode->registrations()->count();
-                    $voucherValid = $usedCount < $voucher->max_usage;
-                } else {
-                    // Single-use: cek apakah sudah dipakai
-                    $voucherValid = !$voucherCode->used && !$voucherCode->registration;
+                // Tandai voucher single-use
+                if (!$voucher->is_multiple_use) {
+                    $voucherCode->used = true;
+                    $voucherCode->save();
                 }
             }
 
-            Log::info('Voucher valid: ' . ($voucherValid ? 'Yes' : 'No'));
-
-            // Tentukan final price
-            $finalPrice = $voucherValid
-                ? floatval($voucher->final_price)   // harga yang harus dibayar (bisa 0 jika gratis)
-                : floatval($categoryTicketType->price); // harga normal tiket
-
-            Log::info('Calculated final price: ' . $finalPrice);
-
-            // Data registrasi
+            // ==== SIAPKAN RESPONSE ====
             $regData = $registration->makeHidden('category_ticket_type')->toArray();
 
-            // Category & Event
             $regData['category'] = $categoryTicketType->category->toArray();
             $regData['category']['event'] = $event->toArray();
 
-            // Voucher info
             $regData['voucher_code'] = $voucherCode ? [
                 ...$voucherCode->toArray(),
-                'valid' => $voucherValid,
+                'valid' => $voucherValid
             ] : null;
 
-            // Ticket type info
             $regData['ticket_type'] = [
                 'name' => $ticketType->name,
                 'price' => $categoryTicketType->price,
@@ -161,58 +150,59 @@ class RegistrationController extends Controller
                 'remaining' => $categoryTicketType->quota - $categoryTicketType->registrations_count,
                 'valid_from' => $categoryTicketType->valid_from,
                 'valid_until' => $categoryTicketType->valid_until,
-                'final_price' => $finalPrice, // harga yang harus dibayar
+                'final_price' => $finalPrice,
             ];
 
-            if ($voucherValid) {
-                if (!$voucher->is_multiple_use) {
-                    // Tandai voucher single-use sebagai used
-                    $voucherCode->used = true;
-                    $voucherCode->save();
-                }
-            }
-            Log::info('Final price: ' . $finalPrice);
-            $shouldPay = floatval($finalPrice) > 0;
-            if ($shouldPay) {
+            // ==== FREE (final_price = 0) → langsung confirmed ====
+            if ($finalPrice == 0) {
+                $subject = $event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
+                $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
+
+                $count = Registration::where('category_ticket_type_id', $registration->category_ticket_type_id)
+                    ->where('status', 'confirmed')
+                    ->count();
+
+                $regIdGenerator = new GenerateBib();
+                $qrGenerator = new QrUtils();
+
+                $regId = $regIdGenerator->generateRegId($count);
+                $qrPath = $qrGenerator->generateQr($registration);
+
+                $regData['payment_url'] = "https://regtix.id/payment/finish/{$registration->registration_code}";
+
+                $registration->update([
+                    'status' => 'confirmed',
+                    'payment_status' => 'paid',
+                    'paid_at' => now(),
+                    'payment_type' => '',
+                    'gross_amount' => 0,
+                    'qr_code_path' => $qrPath,
+                    'reg_id' => $regId
+                ]);
+
+            } else {
+                // ==== NOT FREE → PAYMENT LINK ====
                 $midtrans = new MidtransUtils();
                 $paymment = $midtrans->generatePaymentLink($registration, $event);
 
                 $regData['payment_url'] = $paymment['payment_url'];
-
                 $registration->update(['payment_url' => $paymment['payment_url']]);
+
+                $subject = '[' . $event->name . '] Tagihan Pembayaran - Do Not Reply';
                 $template = file_get_contents(resource_path('email/templates/payment-instruction.html'));
-                $subject = '[' . $event->name . ']' . ' Tagihan Pembayaran - Do Not Reply';
-            } else {
-                $subject = $registration->categoryTicketType->category->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
-                $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
-                $count = Registration::where('category_ticket_type_id', $registration->category_ticket_type_id)
-                    ->where('status', 'confirmed')
-                    ->count();
-                $regIdGenerator = new GenerateBib();
-                $qrGenerator = new QrUtils();
-                $regId = $regIdGenerator->generateRegId($count);
-                $qrPath = $qrGenerator->generateQr($registration);
-                $regData['payment_url'] = "https://regtix.id/payment/finish/{$registration->registration_code}";
-                $registration->update([
-                    'status' => 'confirmed',
-                    'payment_status' => 'paid',
-                    'reg_id' => $regId,
-                    'paid_at' => Carbon::now()->format('Y-m-d H:i:s'),
-                    'payment_type' => '',
-                    'gross_amount' => 0,
-                    'qr_code_path' => $qrPath,
-                ]);
             }
+
+            // ==== SEND EMAIL ====
             $email = new EmailSender();
             $email->sendEmail($registration, $subject, $template);
+
             return response()->json([
                 'message' => 'Registration successful.',
                 'data' => $regData
             ], 201);
+
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => $e->getMessage()
-            ], 500);
+            return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 
