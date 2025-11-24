@@ -30,6 +30,8 @@ class VoucherCodeCheckResource extends JsonResource
                 'id' => $voucher?->id,
                 'name' => $voucher?->name,
                 'final_price' => $voucher?->final_price,
+                'is_multiple_use' => $voucher?->is_multiple_use,
+                'max_usage' => $voucher?->max_usage
             ],
 
             'ticket_type' => $ticketType ? [
