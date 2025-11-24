@@ -88,8 +88,15 @@ class RegistrationController extends Controller
                 $voucher = $voucherCode->voucher;
                 // Validasi single-use
                 if (!$voucher->is_multiple_use) {
+                    // Single-use: cek sudah digunakan
                     if ($voucherCode->used || $voucherCode->registration) {
                         throw new \Exception("Voucher code already used");
+                    }
+                } else {
+                    // Multiple-use: cek sisa penggunaan
+                    $usedCount = $voucherCode->registrations()->count();
+                    if ($usedCount >= $voucher->max_usage) {
+                        throw new \Exception("Voucher code usage limit reached");
                     }
                 }
 
@@ -110,7 +117,18 @@ class RegistrationController extends Controller
             Log::info('Voucher: ' . $voucher);
 
             // Cek apakah voucher valid
-            $voucherValid = $voucherCode && $voucher && ($voucher->is_multiple_use || !$voucherCode->used);
+            $voucherValid = false;
+
+            if ($voucherCode && $voucher) {
+                if ($voucher->is_multiple_use) {
+                    // Multiple-use: cek sisa penggunaan
+                    $usedCount = $voucherCode->registrations()->count();
+                    $voucherValid = $usedCount < $voucher->max_usage;
+                } else {
+                    // Single-use: cek apakah sudah dipakai
+                    $voucherValid = !$voucherCode->used && !$voucherCode->registration;
+                }
+            }
 
             Log::info('Voucher valid: ' . ($voucherValid ? 'Yes' : 'No'));
 
