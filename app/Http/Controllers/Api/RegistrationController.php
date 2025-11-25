@@ -32,7 +32,6 @@ class RegistrationController extends Controller
             $registran = Registration::where('email', $data['email'])
                 ->where('category_ticket_type_id', $data['category_ticket_type_id'])
                 ->where('id_card_number', $data['id_card_number'])
-                ->where('status', 'pending')
                 ->with([
                     'categoryTicketType.ticketType',
                     'categoryTicketType.category',
@@ -42,26 +41,43 @@ class RegistrationController extends Controller
                 ->first();
 
             if ($registran) {
-                $dataResponse = [
-                    ...$registran->toArray(),
-                    'category_ticket_type' => [
-                        ...$registran->categoryTicketType->toArray(),
-                        'ticket_type' => [
-                            ...$registran->categoryTicketType->ticketType->toArray(),
-                        ],
-                        'category' => [
-                            ...$registran->categoryTicketType->category->toArray(),
-                            'event' => [
-                                ...$registran->categoryTicketType->category->event->toArray(),
-                                'event_logo' => asset('storage/' . $registran->categoryTicketType->category->event->event_logo),
-                                'event_banner' => asset('storage/' . $registran->categoryTicketType->category->event->event_banner)
-                            ]
-                        ]
-                    ]
-                ];
+                // Jika PAID → return data + payment_url, selesai
+                if ($registran->payment_status === 'paid') {
+
+                    $res = $registran->makeHidden('category_ticket_type')->toArray();
+                    $res['payment_url'] = "https://regtix.id/payment/finish/{$registran->registration_code}";
+
+                    return response()->json([
+                        'message' => 'Registration exists',
+                        'data' => $res
+                    ], 201);
+                }
+
+                // Jika PENDING → reset voucher + delete registran
+                if ($registran->payment_status === 'pending') {
+
+                    if ($registran->voucherCode) {
+                        $registran->voucherCode->update([
+                            'used' => false
+                        ]);
+                    }
+
+                    $registran->delete();
+                }
+            }
+
+            // Check remaining quota
+
+            $quota = CategoryTicketType::where('id', $data['category_ticket_type_id'])->value('quota');
+            $used = Registration::where('category_ticket_type_id', $data['category_ticket_type_id'])
+                ->where('payment_status', 'paid')
+                ->count();
+            $remaining = max($quota - $used, 0);
+
+            // Jika quota sudah habis → return error
+            if ($remaining <= 0) {
                 return response()->json([
-                    'message' => 'Registration already exists.',
-                    'data' => $dataResponse
+                    'message' => 'Quota untuk kategori ini sudah habis. Silahkan daftar pada kategori lain',
                 ], 409);
             }
 
