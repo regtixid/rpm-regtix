@@ -92,7 +92,7 @@ class RegistrationController extends Controller
                 if ($voucher->is_multiple_use) {
                     $voucherValid = $usedCount < $voucher->max_usage;
                 } else {
-                    $voucherValid = !$voucherCode->used && !$voucherCode->registration;
+                    $voucherValid = !$voucherCode->used;
                 }
 
                 if (!$voucherValid) {
@@ -124,11 +124,7 @@ class RegistrationController extends Controller
                 $registration->voucher_code_id = $voucherCode->id;
                 $registration->save();
 
-                // Tandai voucher single-use
-                if (!$voucher->is_multiple_use) {
-                    $voucherCode->used = true;
-                    $voucherCode->save();
-                }
+                // Tandai voucher single-use               
             }
 
             // ==== SIAPKAN RESPONSE ====
@@ -179,6 +175,11 @@ class RegistrationController extends Controller
                     'qr_code_path' => $qrPath,
                     'reg_id' => $regId
                 ]);
+
+                if (!$voucher->is_multiple_use) {
+                    $voucherCode->used = true;
+                    $voucherCode->save();
+                }
 
             } else {
                 // ==== NOT FREE → PAYMENT LINK ====
