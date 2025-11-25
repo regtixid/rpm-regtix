@@ -94,7 +94,7 @@ class MidtransWebhookController extends Controller
                 $emailSender->sendEmail($registration, $subject, $template);
             }
             
-            if ($registration->voucherCode) {
+            if ($registration->voucherCode && !$registration->voucherCode->voucher->is_multiple_use) {
                 $registration->voucherCode->update([
                     'used' => true
                 ]);
