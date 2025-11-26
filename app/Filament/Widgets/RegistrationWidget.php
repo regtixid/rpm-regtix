@@ -42,7 +42,7 @@ class RegistrationWidget extends BaseWidget
 
             // 1️⃣ Stat total per event
             $totalCount = $eventGroup->count();
-            $totalRevenue = $eventGroup->sum(fn($r) => $r->categoryTicketType->price ?? 0);
+            $totalRevenue = $eventGroup->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0);
 
             $stats[] = Stat::make("{$eventName}", "Rp " . number_format($totalRevenue, 0, ',', '.'))
                 ->description($totalCount . ' Participants')
