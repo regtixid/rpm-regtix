@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 class EmailSender 
 {
     // send email
-    public function sendEmail($registration, $subject, $template) {
+    public function sendEmail($registration, $subject, $template, $overrideEmail = null) {
         try {
             $config = Configuration::getDefaultConfiguration()->setApiKey('api-key', env('BREVO_API_KEY'));
 
@@ -79,7 +79,7 @@ class EmailSender
                 'subject' => $subject,
                 'sender' => ['name' => 'RegTix | ' . $event->name, 'email' => env('MAIL_SENDER')],
                 'replyTo' => ['name' => 'RegTix | ' . $event->name, 'email' => env('MAIL_REPLY_TO')],
-                'to' => [new SendSmtpEmailTo(['email' => $registration->email])], 
+                'to' => [new SendSmtpEmailTo(['email' => $overrideEmail ?? $registration->email])], 
                 'htmlContent' => $template,
                 'params' => $params
             ]);
