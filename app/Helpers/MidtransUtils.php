@@ -72,7 +72,7 @@ class MidtransUtils
             ],
             'expiry' => [
                 'duration' => 1,
-                'unit' => 'day'
+                'unit' => 'days'
             ],
             'item_details' => $itemDetails,
             'title' => $event->name ." ticket payment",
