@@ -45,7 +45,7 @@ class RegistrationExporter extends Exporter
             }),
             ExportColumn::make('invitation_code')->label('Kode Voucher')
             ->formatStateUsing(function(Registration $record){
-                return $record->voucherCode?->voucher?->code ?? "";
+                return $record->voucherCode?->code ?? "";
             }),
         ];
     }
