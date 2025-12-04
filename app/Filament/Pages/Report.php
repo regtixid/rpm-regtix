@@ -21,6 +21,9 @@ class Report extends Page
     public float $totalRevenue = 0;
     public ?int $selectedEvent = null;
 
+    public array $jerseyByCategory = [];
+
+
 
 
     public function updateReport(): void
@@ -60,8 +63,43 @@ class Report extends Page
             'revenues' => $data->map(fn($group) => $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0))->values()->toArray(),
         ];
 
+        $sizeOrder = ['XS','S','M','L','XL','XXL'];
+
+        $this->jerseyByCategory = $registrations
+            ->whereNotNull('jersey_size')
+            ->groupBy(fn($r) => $r->categoryTicketType->category->name)
+            ->map(function ($group) use ($sizeOrder) {
+
+                // hitung jumlah per size
+                $sizes = $group->groupBy('jersey_size')
+                            ->map(fn($g) => $g->count())
+                            ->toArray(); // harus array dulu untuk uksort
+
+                // custom sort berdasarkan prefix
+                uksort($sizes, function($a, $b) use ($sizeOrder) {
+                    $indexA = array_search(
+                        collect($sizeOrder)->first(fn($p) => str_starts_with($a, $p)),
+                        $sizeOrder,
+                        true
+                    );
+                    $indexB = array_search(
+                        collect($sizeOrder)->first(fn($p) => str_starts_with($b, $p)),
+                        $sizeOrder,
+                        true
+                    );
+
+                    $indexA = $indexA === false ? 999 : $indexA;
+                    $indexB = $indexB === false ? 999 : $indexB;
+
+                    return $indexA <=> $indexB;
+                });
+
+                return $sizes;
+            })->toArray();
+
        $this->dispatch('chartUpdated', [
-            'chartData' => $this->chartData ?? ['labels'=>[], 'values'=>[], 'revenues'=>[]]
+            'chartData' => $this->chartData ?? ['labels'=>[], 'values'=>[], 'revenues'=>[]],
+            'jerseySizes' => $this->jerseyByCategory
         ]);
     }
 
