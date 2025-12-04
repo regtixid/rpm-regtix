@@ -22,6 +22,37 @@
         </div>
         @endif
 
+
+        @if(!empty($this->jerseyByCategory))
+        <!-- Title -->
+        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-100">
+            Jersey Size Summary
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6 mt-6">
+            @foreach($this->jerseyByCategory as $category => $sizes)
+                <div class="p-4 bg-white dark:bg-gray-800 shadow rounded-lg">
+                    <!-- Header kategori -->
+                    <h3 class="text-lg font-bold mb-3">{{ $category }}</h3>
+                    <hr class="p-2">
+                    <!-- List size -->
+                    <ul class="space-y-2">
+                        @foreach($sizes as $size => $quantity)
+                            <li class="flex justify-between items-center p-1">
+                                <span class="font-semibold">{{ $size }}</span>
+                                <span class="font-bold">{{ $quantity }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+
+                    <!-- Total per kategori -->
+                    <div class="mt-3 text-right font-semibold text-gray-800 dark:text-gray-200">
+                        Total: {{ array_sum($sizes) }}
+                    </div>
+                </div>
+            @endforeach
+        </div>
+        @endif
+
         {{-- Chart --}}
         <div class="p-6 bg-white dark:bg-gray-800 shadow rounded-2xl mt-8">
             <h3 class="text-gray-700 dark:text-gray-300 text-sm font-semibold mb-4">
@@ -30,7 +61,7 @@
 
             {{-- Scrollable horizontal container --}}
             <div class="w-full overflow-x-auto">
-                <div class="relative" style="height: 300px; min-width: calc(80px * {{ count($this->chartData['labels'] ?? []) }});">
+                <div class="relative" style="min-width: calc(80px * {{ count($this->chartData['labels'] ?? []) }});">
                     <canvas id="registrationChart" wire:ignore></canvas>
                 </div>
             </div>
