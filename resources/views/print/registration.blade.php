@@ -99,7 +99,7 @@
     <div class="header">
       <h2>DATA PENDAFTARAN</h2>
       <h3>{{ $registration->event->name }}</h3>
-      <strong>ID Registrasi: {{ $registration->event->code_prefix }}{{ $registration->reg_id }}</strong>
+      <strong>ID Registrasi: {{ $registration->registration_code }}</strong>
     </div>
 
     <div class="content">
@@ -142,7 +142,7 @@
             <tr><th>Ukuran Jersey</th><td>{{ $registration->jersey_size }}</td></tr>
             <tr><th>Nama Komunitas</th><td>{{ $registration->community_name }}</td></tr>
             <tr><th>Nama di BIB</th><td>{{ $registration->bib_name }}</td></tr>
-            <tr><th>ID Registrasi</th><td>{{$registration->event->code_prefix}}{{ $registration->reg_id }}</td></tr>
+            <tr><th>Nomor BIB</th><td>{{ $registration->reg_id }}</td></tr>
         </table>
       </div>
       <div class="pt-4">
