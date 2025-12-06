@@ -225,7 +225,6 @@ class RegistrationController extends Controller
         try {
 
             $reg = Registration::where('registration_code', $request->registration_code)
-		->where('payment_status', 'paid')
                 ->with(['categoryTicketType.ticketType', 'categoryTicketType.category', 'categoryTicketType.category.event', 'voucherCode.voucher'])
                 ->first();
 
