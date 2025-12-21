@@ -61,13 +61,19 @@ class EventResource extends Resource
                     ->required()
                     ->searchable() // Membolehkan pencarian event
                     ->placeholder('Pick a status'),
+                Select::make('size')
+                    ->label('Event Size') // Label untuk field
+                    ->options(Event::SIZE) // Mengambil nama dan ID event dari model Event
+                    ->required()
+                    ->searchable() // Membolehkan pencarian event
+                    ->placeholder('Pick size'),
                         TextInput::make('location')
                             ->required()
                             ->label('Location')
                             ->maxLength(255),
-                        TextInput::make('location_gmaps_url')
+                        Textarea::make('location_gmaps_url')
                             ->label('Maps URL')
-                            ->maxLength(255),
+                            ->rows(3),
                         DatePicker::make('registration_start_date')
                             ->label('Registration Start Date')
                     ->placeholder('Select Registration Start Date'),
@@ -87,9 +93,9 @@ class EventResource extends Resource
                         TextInput::make('rpc_collection_location')
                             ->label('RPC Collection Location')
                             ->maxLength(255),
-                        TextInput::make('rpc_collection_gmaps_url')
+                        Textarea::make('rpc_collection_gmaps_url')
                             ->label('RPC Collection Maps URL')
-                            ->maxLength(255),
+                            ->rows(3),
                         TextInput::make('event_url')
                             ->label('Event URL')
                             ->maxLength(255),
@@ -148,6 +154,50 @@ class EventResource extends Resource
                                 '4:3',
                                 '1:1',
                             ]),
+                        FileUpload::make('jersey_size_image')
+                            // ->preserveFilenames()
+                            ->label('Jersey Size Chart')
+                            ->image()
+                            ->imageEditor()
+                            ->disk('public')
+                            ->visibility('public')
+                            ->directory(fn($record) => $record?->id
+                                ? "image/event/jersey-size/{$record->id}"
+                                : "image/event/jersey-size/")
+                            ->imageEditorAspectRatios([
+                                null,
+                                '16:9',
+                                '4:3',
+                                '1:1',
+                            ]),
+                        Section::make('Event Slides')
+                            ->schema([
+                                Repeater::make('slides')
+                                    ->relationship('slides')
+                                    ->schema([
+                                        FileUpload::make('image_path')
+                                        ->label('Event Slides')
+                                        ->image()
+                                        ->imageEditor()
+                                        ->disk('public')
+                                        ->visibility('public')
+                                        ->directory('image/event/slides')
+                                        ->imageEditorAspectRatios([
+                                            null,
+                                            '16:9',
+                                            '4:3',
+                                            '1:1',
+                                        ]),
+                                        TextInput::make('caption')
+                                            ->label('Caption')
+                                            ->maxLength(255),
+                                        TextInput::make('order')
+                                            ->label('Order')
+                                            ->numeric()
+                                            ->maxLength(255),
+                                    ])
+                                ->collapsible()
+                            ])
                     ])
                     ->collapsible()
                     ->collapsed(false),
@@ -237,6 +287,10 @@ class EventResource extends Resource
                     ->sortable(),
             TextColumn::make('status')
                 ->label('Status')
+                ->searchable()
+                ->sortable(),
+            TextColumn::make('size')
+                ->label('Size')
                 ->searchable()
                 ->sortable(),
                 TextColumn::make('location')
