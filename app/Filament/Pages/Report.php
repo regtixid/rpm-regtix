@@ -50,9 +50,7 @@ class Report extends Page
 
         $this->totalRegistrations = $registrations->count();
         $this->totalRevenue = $registrations->sum(function ($r) {
-            // Prioritaskan gross_amount yang sebenarnya dibayar dari Midtrans
-            // Jika null, fallback ke perhitungan berdasarkan voucher atau harga normal
-            return $r->gross_amount ?? $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0;
+            return $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0;
         });
 
         // Group by category & ticket type
@@ -62,7 +60,7 @@ class Report extends Page
         $this->chartData = [
             'labels' => $data->keys()->toArray(),
             'values' => $data->map(fn($group) => count($group))->values()->toArray(),
-            'revenues' => $data->map(fn($group) => $group->sum(fn($r) => $r->gross_amount ?? $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0))->values()->toArray(),
+            'revenues' => $data->map(fn($group) => $group->sum(fn($r) => $r->voucherCode?->voucher?->final_price ?? $r->categoryTicketType->price ?? 0))->values()->toArray(),
         ];
 
         $sizeOrder = ['XS','S','M','L','XL','XXL'];
