@@ -86,14 +86,25 @@ class MidtransWebhookController extends Controller
                 'gross_amount' => $grossAmount,
                 'qr_code_path' => $qrPath,
             ]);
-            $emailSender = new EmailSender();
-            $subject = $registration->categoryTicketType->category->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
-            $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
-            $emailSender->sendEmail($registration, $subject, $template);
+
+            if($status === 'paid'){
+                $emailSender = new EmailSender();
+                $subject = $registration->categoryTicketType->category->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
+                $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
+                $emailSender->sendEmail($registration, $subject, $template);
+            }
+            
+            // ==== Mark voucher as used HANYA untuk single use (Bug #3) ====
             if ($registration->voucherCode) {
+                $voucher = $registration->voucherCode->voucher;
+                
+                // Hanya mark used untuk single use voucher
+                // Multiple use voucher tidak perlu di-mark used, usage dihitung dari registrations
+                if ($voucher && !$voucher->is_multiple_use) {
                 $registration->voucherCode->update([
                     'used' => true
                 ]);
+                }
             }
         }
     }

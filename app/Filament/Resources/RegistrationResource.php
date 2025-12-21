@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Exports\RegistrationExporter;
 use App\Filament\Resources\RegistrationResource\Pages;
 use App\Helpers\CountryListHelper;
+use App\Helpers\EmailSender;
 use App\Models\CategoryTicketType;
 use App\Models\Event;
 use App\Models\Registration;
@@ -21,6 +22,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Actions\ExportAction;
+use Filament\Notifications\Notification;
 use Filament\Tables\Actions\ExportBulkAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\ActionsPosition;
@@ -71,6 +73,12 @@ class RegistrationResource extends Resource
                 )
                 ->searchable()
                 ->preload(),
+            Select::make('voucher_code_id')
+                ->label('Voucher Code')
+                ->relationship('voucherCode', 'code')
+                ->searchable()
+                ->preload()
+                ->placeholder('Select a Voucher Code'),
             TextInput::make('registration_code')
                 ->label('Registration Code')
                 ->readOnly(),
@@ -191,6 +199,18 @@ class RegistrationResource extends Resource
                     ->sortable()
                     ->searchable()
                     ->dateTime(),
+                TextColumn::make('payment_status')
+                    ->label('Payment Status')
+                    ->badge()
+                    ->icon(fn($record) => $record->payment_status === 'paid' ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+                    ->formatStateUsing(fn(string $state) => $state === 'paid' ? 'Paid' : 'Unpaid')
+                    ->color(fn($record) => $record->payment_status === 'paid' ? 'success' : 'danger')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('voucherCode.code')
+                    ->label('Voucher Code')
+                    ->sortable()
+                    ->searchable(),
             TextColumn::make('registration_code')
                 ->label('Registration Code')
                 ->sortable()
@@ -378,6 +398,36 @@ class RegistrationResource extends Resource
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(3)
             ->actions([
+                Action::make('send_email')
+                    ->label('Send Email')
+                    ->icon('heroicon-o-envelope')
+                    ->modalWidth('sm')
+                    ->visible(fn($record) => $record->payment_status === 'paid')
+                    ->form([
+                        TextInput::make('email_address')
+                            ->label('Email Address')
+                            ->email()
+                            ->required()
+                            ->maxLength(225)
+                            ->default(fn ($record) => $record->email),
+                        TextInput::make('cc_email_address')
+                            ->label('Email Address')
+                            ->email()
+                            ->maxLength(225)
+                        ])
+                    ->action(function($record, array $data){
+                        $email = new EmailSender();
+                        $subject = $record->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
+                        $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
+                        $email->sendEmail($record, $subject, $template, $data['email_address'], $data['cc_email_address']);
+
+                        Notification::make()
+                            ->title('Email sent successfully!')
+                            ->success()
+                            ->send();
+
+                    })
+                    ->modalSubmitActionLabel('Send Email'),
                 Action::make('print')
                     ->label('Print')
                     ->icon('heroicon-m-printer')
@@ -388,10 +438,6 @@ class RegistrationResource extends Resource
                     ->visible(function ($record) {
                         return $record->is_validated;
                     }),
-                Tables\Actions\ViewAction::make()
-                    ->color('success')
-                    ->icon('heroicon-o-eye')
-                    ->label('View'),
             ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

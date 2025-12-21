@@ -16,16 +16,43 @@ class VoucherController extends Controller
             'category_ticket_type_id' => 'required|integer|exists:category_ticket_type,id',
         ]);
 
-
-        $voucherCode = VoucherCode::with(['voucher.categoryTicketType.ticketType'])
-            ->where(['code' => $request->code, 'used' => false])
+        $voucherCode = VoucherCode::with([
+                'voucher.categoryTicketType.ticketType',
+                'registrations'
+            ])
+            ->where('code', $request->code)
             ->whereHas('voucher.categoryTicketType', function ($query) use ($request) {
                 $query->where('id', $request->category_ticket_type_id);
-            })->whereDoesntHave('registration')
+            })
             ->first();
 
         if (!$voucherCode) {
-            return response()->json(['message' => 'Kode voucher tidak ditemukan.'], 404);
+            return response()->json(['message' => 'Kode voucher tidak ditemukan.', 'data' => []], 404);
+        }
+
+        $voucher = $voucherCode->voucher;
+
+        // --- VALIDASI SINGLE USE ---
+        if (!$voucher->is_multiple_use) {
+            // single use hanya boleh dipakai jika used = false
+            if ($voucherCode->used) {
+                return response()->json([
+                    'message' => 'Kode voucher sudah digunakan.',
+                    'data' => []
+                ], 400);
+            }
+        }
+
+        // --- VALIDASI MULTI USE ---
+        if ($voucher->is_multiple_use) {
+            $usedCount = $voucherCode->registrations()->count();
+
+            if ($usedCount >= $voucher->max_usage) {
+                return response()->json([
+                    'message' => 'Voucher sudah mencapai batas penggunaan.',
+                    'data' => []
+                ], 400);
+            }
         }
 
         return new VoucherCodeCheckResource($voucherCode);

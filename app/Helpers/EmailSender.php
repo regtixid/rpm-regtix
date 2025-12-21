@@ -6,6 +6,7 @@ use Brevo\Client\Api\TransactionalEmailsApi;
 use Brevo\Client\ApiException;
 use Brevo\Client\Configuration;
 use Brevo\Client\Model\SendSmtpEmail;
+use Brevo\Client\Model\SendSmtpEmailCc;
 use Brevo\Client\Model\SendSmtpEmailTo;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 class EmailSender 
 {
     // send email
-    public function sendEmail($registration, $subject, $template) {
+    public function sendEmail($registration, $subject, $template, $overrideEmail = null, $overrideCC = null) {
         try {
             $config = Configuration::getDefaultConfiguration()->setApiKey('api-key', env('BREVO_API_KEY'));
 
@@ -28,8 +29,13 @@ class EmailSender
             $voucher = $registration->voucherCode->voucher ?? null;
             $categoryTicketType = $registration->categoryTicketType;
             $price = $categoryTicketType->price;
-            $priceReduction = $voucher ? $categoryTicketType->price * ($voucher->discount / 100) : 0;
-            $finalPrice = $categoryTicketType->price - $priceReduction;
+            if ($voucher) {
+                $finalPrice = $voucher->final_price;                
+                $priceReduction = $categoryTicketType->price - $voucher->final_price;
+            } else {
+                $finalPrice = $categoryTicketType->price;
+                $priceReduction = 0;
+            }
 
             $voucherCode = $registration->voucherCode;
 
@@ -40,6 +46,8 @@ class EmailSender
                 'phone' => $registration->phone,
                 'email' => $registration->email,
                 'event' => $event->name,
+                'distance' => $registration->categoryTicketType->category->distance ? $registration->categoryTicketType->category->distance . ' Km' : '',
+                'event_date' => $event->start_date ? Carbon::parse($event->start_date)->format('d M Y') : '-',
                 'rpc_start_date' => $event->rpc_start_date ? Carbon::parse($event->rpc_start_date)->format('d M Y') : '-',
                 'rpc_end_date' => $event->rpc_end_date ? Carbon::parse($event->rpc_end_date)->format('d M Y') : '-',
                 'rpc_times' => $event->rpc_collection_times,
@@ -63,13 +71,17 @@ class EmailSender
                 'price_reduction' => '- '.$this->formatMoney($priceReduction),
                 'final_price' => $this->formatMoney($finalPrice),
                 'voucher' => $voucher ? $voucherCode->code : 'No Voucher',
-                'year' => Carbon::now()->year
+                'year' => Carbon::now()->year,
+                'ig_url' => $event->ig_url,
+                'fb_url' => $event->fb_url,
+                'event_callwa' => $event->contact_phone
             ];
             $sendSmtpEmail = new SendSmtpEmail([
                 'subject' => $subject,
                 'sender' => ['name' => 'RegTix | ' . $event->name, 'email' => env('MAIL_SENDER')],
                 'replyTo' => ['name' => 'RegTix | ' . $event->name, 'email' => env('MAIL_REPLY_TO')],
-                'to' => [new SendSmtpEmailTo(['email' => $registration->email])], 
+                'to' => [new SendSmtpEmailTo(['email' => $overrideEmail ?? $registration->email])], 
+                'cc' => $overrideCC ? [new SendSmtpEmailCc(['email' => $overrideCC])] : null,
                 'htmlContent' => $template,
                 'params' => $params
             ]);

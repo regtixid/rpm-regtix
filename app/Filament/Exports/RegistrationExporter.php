@@ -17,7 +17,9 @@ class RegistrationExporter extends Exporter
         return [
             ExportColumn::make('id')
                 ->label('ID'),
-            ExportColumn::make('ticketType.name')->label('Tiket'),
+            ExportColumn::make('registration_code')->label('Kode Tiket'),
+            ExportColumn::make('categoryTicketType.category.name')->label('Kategory'),
+            ExportColumn::make('categoryTicketType.ticketType.name')->label('Tipe Tiket'),
             ExportColumn::make('full_name')->label('Nama'),
             ExportColumn::make('email')->label('Email'),
             ExportColumn::make('phone')->label('Nomor HP'),
@@ -36,10 +38,17 @@ class RegistrationExporter extends Exporter
             ExportColumn::make('nationality')->label('Kewarganegaraan'),
             ExportColumn::make('jersey_size')->label('Size Jersey'),
             ExportColumn::make('community_name')->label('Komunitas'),
-            ExportColumn::make('bib_name')->label('Nomer BIB'),
+            ExportColumn::make('bib_name')->label('Nama BIB'),
             ExportColumn::make('reg_id')->label('Nomer Registrasi'),
             ExportColumn::make('registration_date')->label('Tanggal Registrasi'),
-            ExportColumn::make('invitation_code')->label('Kode Undangan'),            
+            ExportColumn::make('gross_amount')->label('Gross Amount')
+            ->formatStateUsing(function(Registration $record){
+                return $record->voucherCode?->voucher?->final_price ?? $record->categoryTicketType?->price ?? 0;
+            }),
+            ExportColumn::make('invitation_code')->label('Kode Voucher')
+            ->formatStateUsing(function(Registration $record){
+                return $record->voucherCode?->code ?? "";
+            }),
         ];
     }
 

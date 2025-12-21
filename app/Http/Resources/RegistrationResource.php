@@ -20,6 +20,7 @@ class RegistrationResource extends JsonResource
             'id' => $this->id,
             'event_id' => $this->event_id,
             'category_ticket_type_id' => $this->category_ticket_type_id,
+            'voucher_code_id' => $this->voucher_code_id,
             'full_name' => $this->full_name,
             'email' => $this->email,
             'phone' => $this->phone,
@@ -39,12 +40,22 @@ class RegistrationResource extends JsonResource
             'jersey_size' => $this->jersey_size,
             'community_name' => $this->community_name,
             'bib_name' => $this->bib_name,
-            // 'voucher_code' => VoucherCodeResource::collection($this->whenLoaded('voucherCode')),
+            'voucher_code' => $this->whenLoaded('voucherCode', function () {
+                return [
+                    'id' => $this->voucherCode->id,
+                    'code' => $this->voucherCode->code,
+                    'used' => $this->voucherCode->used,
+                    'voucher' => [
+                        'id' => $this->voucherCode->voucher->id,
+                        'name' => $this->voucherCode->voucher->name,
+                        'final_price' => $this->voucherCode->voucher->final_price,
+                    ],
+                ];
+            }),
 
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
-            'all' => $this->vocherCode,
         ];
     }
 }

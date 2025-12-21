@@ -15,8 +15,12 @@ class CategoryTicketTypeResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $categoryTicketType = CategoryTicketType::withCount('registrations')->find($this->pivot->id);
-        $used = $categoryTicketType->registrations_count ?? 0;
+        $categoryTicketType = CategoryTicketType::withCount(['registrations as paid_registrations_count' => function ($q) {
+            $q->where('payment_status', 'paid');
+        }])->find($this->pivot->id);
+
+        $used = $categoryTicketType->paid_registrations_count ?? 0;
+
 
         return [
             'category_ticket_type_id'   => $this->pivot->id,

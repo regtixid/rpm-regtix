@@ -3,8 +3,10 @@
 namespace App\Filament\Resources\RegistrationResource\Pages;
 
 use App\Filament\Resources\RegistrationResource;
+use App\Helpers\EmailSender;
 use Filament\Actions;
 use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Auth;
@@ -23,8 +25,55 @@ class ViewRegistration extends EditRecord
     protected function getFormActions(): array
     {
         return [
+            Action::make('send_email')
+                ->label('Send Email')
+                ->icon('heroicon-o-envelope')
+                ->modalWidth('sm')
+                ->visible(fn($record) => $record->payment_status === 'paid')
+                ->form([
+                    TextInput::make('email_address')
+                        ->label('Email Address')
+                        ->email()
+                        ->required()
+                        ->maxLength(225)
+                        ->default(fn ($record) => $record->email),
+                    TextInput::make('cc_email_address')
+                        ->label('Email Address')
+                        ->email()
+                        ->maxLength(225)
+                    ])
+                ->action(function($record, array $data){
+                    $email = new EmailSender();
+                    $subject = $record->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
+                    $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
+                    $email->sendEmail($record, $subject, $template, $data['email_address'], $data['cc_email_address']);
+
+                    Notification::make()
+                        ->title('Email sent successfully!')
+                        ->success()
+                        ->send();
+                })
+                ->modalSubmitActionLabel('Send Email'),
+            Action::make('save')
+                ->label('Save')
+                ->icon('heroicon-m-inbox-arrow-down')
+                ->requiresConfirmation()
+                ->color('success')
+                ->action(function ($record, $livewire) {
+                    // Validasi form terlebih dahulu
+                    $data = $livewire->form->getState();
+                    $livewire->form->validate();
+
+                    // Update record dengan data tervalidasi + tambahan kolom
+                    $record->update([
+                        ...$data
+                    ]);
+
+                    // Kirim notifikasi "saved"
+                    $livewire->getSavedNotification()?->send();
+                }),
             Action::make('validate')
-                ->label('Save & Validate')
+                ->label('Validate')
                 ->icon('heroicon-m-check-badge')
                 ->requiresConfirmation()
                 ->color('success')
@@ -35,7 +84,6 @@ class ViewRegistration extends EditRecord
 
                     // Update record dengan data tervalidasi + tambahan kolom
                     $record->update([
-                        ...$data,
                         'is_validated' => true,
                         'validated_by' => Auth::id(),
                     ]);

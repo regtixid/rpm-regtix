@@ -44,15 +44,27 @@ class VoucherCodeResource extends Resource
             TextColumn::make('voucher.categoryTicketType.ticketType.name')->searchable()
                 ->label('Ticket Type Name'),
                 TextColumn::make('code')->label('Voucher Code')->searchable(),
-                TextColumn::make('used')->label('Used')->formatStateUsing(fn(bool $state) => $state ? 'Yes' : 'No')
-                ->badge()
-                ->color(fn(bool $state) => $state ? 'success' : 'danger'),
-                TextColumn::make('registration_id')->label('Registration ID'),
+                TextColumn::make('used')
+                    ->label('Used')
+                    ->getStateUsing(function ($record) {
+                        return $record->registrations()->count();
+                    })   // single-use: 1 jika sudah dipakai
+                    ->badge()
+                    ->color(fn($state) => $state > 0 ? 'success' : 'danger'),
+
+                TextColumn::make('remaining')
+                    ->label('Remaining')
+                    ->getStateUsing(function ($record) {
+                        $used = $record->registrations()->count(); // jumlah registrasi terkait
+                        return ($record->voucher->is_multiple_use ? $record->voucher->max_usage : 1) - $used;
+                    })
+                    ->badge()
+                    ->color(fn($state) => $state > 0 ? 'success' : 'danger'),
                 // Kolom lain yang dibutuhkan
             ])
             ->filters([
                 // Filter berdasarkan voucher_id jika ada
-               
+
             ]);
     }
 

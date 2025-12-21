@@ -38,6 +38,7 @@ class Registration extends Model
     //
     protected $fillable = [
         'category_ticket_type_id',
+        'voucher_code_id',
         'full_name',
         'email',
         'phone',
@@ -111,6 +112,6 @@ class Registration extends Model
 
     public function voucherCode()
     {
-        return $this->hasOne(VoucherCode::class, 'registration_id', 'id');
+        return $this->belongsTo(VoucherCode::class, 'voucher_code_id');
     }
 }
