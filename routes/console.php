@@ -11,3 +11,15 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Schedule::command('app:send-email-campaign')->everyThreeMinutes();
+
+// Cleanup unpaid registrations setiap jam
+Schedule::command('app:cleanup-unpaid-registrations')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer(); // Jika menggunakan multiple servers
+
+// Cleanup registration_failed yang sudah > 90 hari (harian)
+Schedule::command('app:cleanup-old-registration-failed')
+    ->daily()
+    ->withoutOverlapping()
+    ->onOneServer();
