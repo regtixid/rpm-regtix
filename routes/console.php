@@ -23,3 +23,9 @@ Schedule::command('app:cleanup-old-registration-failed')
     ->daily()
     ->withoutOverlapping()
     ->onOneServer();
+
+// Poll email status from Brevo API every 30 minutes (fallback for webhook)
+Schedule::command('app:check-email-status')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
