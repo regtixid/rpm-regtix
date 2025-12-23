@@ -64,32 +64,45 @@ class RegistrationController extends Controller
             }
 
 
-            // Check remaining quota
-
-            $quota = CategoryTicketType::where('id', $data['category_ticket_type_id'])->value('quota');
-            $used = Registration::where('category_ticket_type_id', $data['category_ticket_type_id'])
-                ->where('payment_status', 'paid')
-                ->count();
-            $remaining = max($quota - $used, 0);
-
-            // Jika quota sudah habis → return error
-            if ($remaining <= 0) {
-                return response()->json([
-                    'message' => 'Quota untuk kategori ini sudah habis. Silahkan daftar pada kategori lain',
-                ], 409);
-            }
-
             // ==== VALIDASI VOUCHER DAN CREATE REGISTRATION DALAM TRANSACTION ====
             $voucherCode = null;
             $voucher = null;
             $voucherValid = false;
             $finalPrice = 0;
-            $categoryTicketType = CategoryTicketType::find($data['category_ticket_type_id']);
+            // Perbaikan: Load categoryTicketType dengan withCount untuk menghindari bug registrations_count
+            $categoryTicketType = CategoryTicketType::withCount('registrations')
+                ->find($data['category_ticket_type_id']);
+            
+            if (!$categoryTicketType) {
+                return response()->json(['message' => 'Category ticket type not found.'], 404);
+            }
+            
             $ticketType = $categoryTicketType->ticketType;
+            
+            // Perbaikan: Validasi ticketType tidak null
+            if (!$ticketType) {
+                return response()->json(['message' => 'Ticket type not found for this category ticket type.'], 404);
+            }
 
             // Wrap voucher validation and registration creation in transaction
             try {
                 $registration = DB::transaction(function () use ($data, $event, &$voucherCode, &$voucher, &$voucherValid, &$finalPrice, $categoryTicketType, $ticketType) {
+                    // Perbaikan: Pindahkan pengecekan quota ke dalam transaction dengan lock untuk prevent race condition
+                    $categoryTicketTypeLocked = CategoryTicketType::lockForUpdate()
+                        ->withCount(['registrations' => function ($query) {
+                            $query->where('payment_status', 'paid');
+                        }])
+                        ->find($categoryTicketType->id);
+                    
+                    $quota = $categoryTicketTypeLocked->quota;
+                    $used = $categoryTicketTypeLocked->registrations_count ?? 0;
+                    $remaining = max($quota - $used, 0);
+
+                    // Jika quota sudah habis → throw exception
+                    if ($remaining <= 0) {
+                        throw new \Exception('Quota untuk kategori ini sudah habis. Silahkan daftar pada kategori lain');
+                    }
+                    
                     if (!empty($data['voucher_code'])) {
                         // Lock voucher code row to prevent race condition
                         $voucherCode = VoucherCode::where('code', $data['voucher_code'])
@@ -108,7 +121,9 @@ class RegistrationController extends Controller
                         }
 
                         // ==== Hitung penggunaan voucher dengan lock untuk prevent race condition ====
-                        $usedCount = $voucherCode->registrations()->count();
+                        // Perbaikan: Hanya hitung registrasi yang sudah paid, bukan semua registrasi
+                        // Voucher hanya terhitung digunakan ketika pembayaran berhasil
+                        $usedCount = $voucherCode->registrations()->where('payment_status', 'paid')->count();
 
                         if ($voucher->is_multiple_use) {
                             $voucherValid = $usedCount < $voucher->max_usage;
@@ -155,6 +170,8 @@ class RegistrationController extends Controller
                     $statusCode = 404;
                 } elseif (str_contains($message, 'already used or expired')) {
                     $statusCode = 400;
+                } elseif (str_contains($message, 'Quota untuk kategori ini sudah habis')) {
+                    $statusCode = 409;
                 }
                 
                 return response()->json(['message' => $message], $statusCode);
@@ -171,12 +188,18 @@ class RegistrationController extends Controller
                 'valid' => $voucherValid
             ] : null;
 
+            // Perbaikan: Refresh categoryTicketType untuk mendapatkan registrations_count yang ter-update
+            $categoryTicketType->refresh();
+            $categoryTicketType->loadCount(['registrations' => function ($query) {
+                $query->where('payment_status', 'paid');
+            }]);
+            
             $regData['ticket_type'] = [
                 'name' => $ticketType->name,
                 'price' => $categoryTicketType->price,
                 'quota' => $categoryTicketType->quota,
-                'used' => $categoryTicketType->registrations_count,
-                'remaining' => $categoryTicketType->quota - $categoryTicketType->registrations_count,
+                'used' => $categoryTicketType->registrations_count ?? 0,
+                'remaining' => $categoryTicketType->quota - ($categoryTicketType->registrations_count ?? 0),
                 'valid_from' => $categoryTicketType->valid_from,
                 'valid_until' => $categoryTicketType->valid_until,
                 'final_price' => $finalPrice,
@@ -184,35 +207,44 @@ class RegistrationController extends Controller
 
             // ==== FREE (final_price = 0) → langsung confirmed ====
             if ($finalPrice == 0) {
+                // Perbaikan: Gunakan transaction untuk prevent race condition pada generateRegId dan voucher update
+                DB::transaction(function () use ($registration, $event, $voucher, $voucherCode, &$regData) {
+                    // Perbaikan: Lock untuk prevent race condition saat generate reg_id
+                    $count = Registration::lockForUpdate()
+                        ->where('category_ticket_type_id', $registration->category_ticket_type_id)
+                        ->where('status', 'confirmed')
+                        ->count();
+
+                    $regIdGenerator = new GenerateBib();
+                    $qrGenerator = new QrUtils();
+
+                    $regId = $regIdGenerator->generateRegId($count);
+                    $qrPath = $qrGenerator->generateQr($registration);
+
+                    $registration->update([
+                        'status' => 'confirmed',
+                        'payment_status' => 'paid',
+                        'paid_at' => now(),
+                        'payment_type' => '',
+                        'gross_amount' => 0,
+                        'qr_code_path' => $qrPath,
+                        'reg_id' => $regId
+                    ]);
+
+                    // Perbaikan: Update voucher code dalam transaction untuk prevent race condition
+                    if ($voucher && $voucherCode && !$voucher->is_multiple_use) {
+                        $voucherCode->lockForUpdate();
+                        $voucherCode->used = true;
+                        $voucherCode->save();
+                    }
+                });
+
                 $subject = $event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
                 $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
-
-                $count = Registration::where('category_ticket_type_id', $registration->category_ticket_type_id)
-                    ->where('status', 'confirmed')
-                    ->count();
-
-                $regIdGenerator = new GenerateBib();
-                $qrGenerator = new QrUtils();
-
-                $regId = $regIdGenerator->generateRegId($count);
-                $qrPath = $qrGenerator->generateQr($registration);
-
+                
+                // Refresh registration untuk mendapatkan reg_id yang baru
+                $registration->refresh();
                 $regData['payment_url'] = "https://regtix.id/payment/finish/{$registration->registration_code}";
-
-                $registration->update([
-                    'status' => 'confirmed',
-                    'payment_status' => 'paid',
-                    'paid_at' => now(),
-                    'payment_type' => '',
-                    'gross_amount' => 0,
-                    'qr_code_path' => $qrPath,
-                    'reg_id' => $regId
-                ]);
-
-                if ($voucher && $voucherCode && !$voucher->is_multiple_use) {
-                    $voucherCode->used = true;
-                    $voucherCode->save();
-                }
 
             } else {
                 // ==== NOT FREE → PAYMENT LINK ====

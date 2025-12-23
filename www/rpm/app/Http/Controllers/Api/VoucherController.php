@@ -45,7 +45,9 @@ class VoucherController extends Controller
 
         // --- VALIDASI MULTI USE ---
         if ($voucher->is_multiple_use) {
-            $usedCount = $voucherCode->registrations()->count();
+            // Perbaikan: Hanya hitung registrasi yang sudah paid, bukan semua registrasi
+            // Voucher hanya terhitung digunakan ketika pembayaran berhasil
+            $usedCount = $voucherCode->registrations()->where('payment_status', 'paid')->count();
 
             if ($usedCount >= $voucher->max_usage) {
                 return response()->json([

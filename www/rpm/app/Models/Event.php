@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use App\Models\CategoryTicketType;
 use App\Models\Registration;
 
 
@@ -24,7 +23,7 @@ class Event extends Model
         'Small' => 'Small'
     ];
 
-    public $fillable = [
+    protected $fillable = [
         'name',
         'start_date',
         'end_date',
@@ -57,11 +56,12 @@ class Event extends Model
 
     public function registrations()
     {
-        // Fixed: hasManyThrough only supports one intermediate table
-        // Correct path: Event -> Category -> CategoryTicketType -> Registration
-        // Registration has category_ticket_type_id, not ticket_type_id
-        // Original bug: used TicketType as intermediate, but Registration doesn't have ticket_type_id
-        // Solution: Use whereHas to filter registrations through the correct relationship path
+        // Perbaikan: hasManyThrough hanya mendukung satu tabel intermediate
+        // Jalur yang benar: Event -> Category -> CategoryTicketType -> Registration
+        // Karena Laravel's hasManyThrough tidak bisa menangani multiple tabel intermediate,
+        // kita menggunakan query-based relationship yang menggabungkan melalui chain dengan benar
+        // Ini mengembalikan query builder yang memfilter registrasi untuk event ini
+        // Catatan: Ini bukan relasi Eloquent sejati tapi berfungsi untuk query
         return Registration::whereHas('categoryTicketType.category', function ($query) {
             $query->where('event_id', $this->id);
         });
@@ -86,8 +86,16 @@ class Event extends Model
         return $this->hasMany(EventSlide::class);
     }
 
-    protected static function booted()
+    protected static function boot()
     {
+        parent::boot();
+        
+        static::creating(function ($event) {
+            if (empty($event->slug)) {
+                $event->slug = Str::slug($event->name);
+            }
+        });
+
         static::created(function ($event) {
             // Pindah logo, banner, jersey
             foreach ([
@@ -107,6 +115,12 @@ class Event extends Model
             }
         });
 
+        static::updating(function ($event) {
+            // hanya jika name berubah
+            if (empty($event->slug) || $event->isDirty('name')) {
+                $event->slug = Str::slug($event->name);
+            }
+        });
 
         // static::saved(function ($event) {
         //     if ($event->slides()->exists()) {
@@ -129,23 +143,5 @@ class Event extends Model
         //         }
         //     }
         // });
-
-    }
-
-    protected static function boot()
-    {
-        parent::boot();
-        static::creating(function ($event) {
-            if (empty($event->slug)) {
-                $event->slug = Str::slug($event->name);
-            }
-        });
-
-        static::updating(function ($event) {
-            // hanya jika name berubah
-            if (empty($event->slug) || $event->isDirty('name')) {
-                $event->slug = Str::slug($event->name);
-            }
-        });
     }
 }

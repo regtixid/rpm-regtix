@@ -30,7 +30,9 @@ class EmailCampaignController extends Controller
             Log::info($registration);
             
             $this->sendEmail($campaign, $registration);
-            if ($campaign->registrations()->where('registration_id', $registration->id)->exists()) {
+            // Perbaikan: Query yang benar untuk cek pivot relationship menggunakan where('id', ...)
+            // karena belongsToMany sudah dalam konteks Registration model
+            if ($campaign->registrations()->where('registrations.id', $registration->id)->exists()) {
                 // Jika pivot sudah ada, update status
                 $campaign->registrations()->updateExistingPivot($registration->id, ['status' => 'sent']);
             } else {
@@ -52,7 +54,8 @@ class EmailCampaignController extends Controller
 
             $params = [
                 'name' => $registration->full_name,
-                'reg_id' => $registration->event?->code_prefix.$registration->reg_id
+                // Perbaikan: Gunakan null coalescing untuk menghindari "null123" jika code_prefix null
+                'reg_id' => ($registration->event?->code_prefix ?? '') . $registration->reg_id
             ];
             $sendSmtpEmail = new SendSmtpEmail([
                 'subject' => $campaign->subject,

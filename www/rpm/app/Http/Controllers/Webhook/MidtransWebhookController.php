@@ -82,39 +82,49 @@ class MidtransWebhookController extends Controller
             return;
         }
 
-        $eventId = $registration->categoryTicketType->category->event->id;
-        $count = Registration::where('status', 'confirmed')
-            ->whereHas('categoryTicketType.category.event', function ($q) use ($eventId) {
-                $q->where('event_id', $eventId);
-            })
-            ->count();
-        $regIdGenerator = new GenerateBib();
-        $regId = $regIdGenerator->generateRegId($count);
-        
-        $qrGenerator = new QrUtils();
-        $qrPath = $qrGenerator->generateQr($registration);
-        $registration->update([                
-            'status' => 'confirmed',
-            'payment_status' => $status,
-            'transaction_code' => $transactionId,
-            'reg_id' => $regId,
-            'paid_at' => $transactionTime,
-            'payment_type' => $paymentType,
-            'gross_amount' => $grossAmount,
-            'qr_code_path' => $qrPath,
-        ]);
+        // Perbaikan: Gunakan transaction dengan lock untuk prevent race condition pada generateRegId dan voucher update
+        \Illuminate\Support\Facades\DB::transaction(function () use ($registration, $status, $transactionId, $transactionTime, $paymentType, $grossAmount, $eventId) {
+            // Perbaikan: Lock untuk prevent race condition saat generate reg_id
+            $count = Registration::lockForUpdate()
+                ->where('status', 'confirmed')
+                ->whereHas('categoryTicketType.category.event', function ($q) use ($eventId) {
+                    $q->where('event_id', $eventId);
+                })
+                ->count();
+            
+            $regIdGenerator = new GenerateBib();
+            $regId = $regIdGenerator->generateRegId($count);
+            
+            $qrGenerator = new QrUtils();
+            $qrPath = $qrGenerator->generateQr($registration);
+            
+            $registration->update([                
+                'status' => 'confirmed',
+                'payment_status' => $status,
+                'transaction_code' => $transactionId,
+                'reg_id' => $regId,
+                'paid_at' => $transactionTime,
+                'payment_type' => $paymentType,
+                'gross_amount' => $grossAmount,
+                'qr_code_path' => $qrPath,
+            ]);
+
+            // Perbaikan: Update voucher code dalam transaction untuk prevent race condition
+            if ($registration->voucherCode && $registration->voucherCode->voucher && !$registration->voucherCode->voucher->is_multiple_use) {
+                $registration->voucherCode->lockForUpdate();
+                $registration->voucherCode->update([
+                    'used' => true
+                ]);
+            }
+        });
 
         if($status === 'paid'){
+            // Refresh registration untuk mendapatkan data terbaru
+            $registration->refresh();
             $emailSender = new EmailSender();
             $subject = $registration->categoryTicketType->category->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
             $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
             $emailSender->sendEmail($registration, $subject, $template);
-        }
-        
-        if ($registration->voucherCode && $registration->voucherCode->voucher && !$registration->voucherCode->voucher->is_multiple_use) {
-            $registration->voucherCode->update([
-                'used' => true
-            ]);
         }
     }
 }
