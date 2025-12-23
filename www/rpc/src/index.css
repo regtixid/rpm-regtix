@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #f8f9fa;
+    color: #111827;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    background-color: #2563eb;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+  }
+  .btn-primary:hover {
+    background-color: #1d4ed8;
+  }
+  .btn-primary:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .btn-secondary {
+    background-color: #e5e7eb;
+    color: #1f2937;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+  }
+  .btn-secondary:hover {
+    background-color: #d1d5db;
+  }
+  .btn-secondary:focus {
+    outline: 2px solid #6b7280;
+    outline-offset: 2px;
+  }
+  
+  .btn-danger {
+    background-color: #dc2626;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+  }
+  .btn-danger:hover {
+    background-color: #b91c1c;
+  }
+  .btn-danger:focus {
+    outline: 2px solid #ef4444;
+    outline-offset: 2px;
+  }
+  
+  .btn-success {
+    background-color: #16a34a;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+  }
+  .btn-success:hover {
+    background-color: #15803d;
+  }
+  .btn-success:focus {
+    outline: 2px solid #22c55e;
+    outline-offset: 2px;
+  }
+  
+  .input-field {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+  }
+  .input-field:focus {
+    outline: 2px solid #3b82f6;
+    border-color: transparent;
+  }
+  
+  .card {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+}
+
+/* Print Styles */
+@media print {
+  @page {
+    margin: 1cm;
+  }
+  
+  body {
+    background-color: white;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-after: always;
+  }
+  
+  .print-avoid-break {
+    page-break-inside: avoid;
+  }
+}

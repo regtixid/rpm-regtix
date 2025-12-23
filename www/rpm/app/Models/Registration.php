@@ -95,10 +95,11 @@ class Registration extends Model
     {
         return $this->hasOneThrough(TicketType::class, CategoryTicketType::class, 'id', 'id', 'category_ticket_type_id', 'ticket_type_id');
     }
-    public function event()
-    {
-        return $this->hasOneThrough(Event::class, TicketType::class, 'id', 'id', 'ticket_type_id', 'event_id');
-    }
+    
+    // Note: event() relationship removed - use $registration->event (accessor) instead
+    // The accessor getEventAttribute() correctly traverses:
+    // Registration -> CategoryTicketType -> Category -> Event
+    // hasOneThrough() cannot handle multiple intermediate tables, so the relationship was broken
 
     public function validator()
     {

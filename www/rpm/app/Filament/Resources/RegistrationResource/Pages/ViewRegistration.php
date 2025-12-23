@@ -15,6 +15,13 @@ class ViewRegistration extends EditRecord
 {
     protected static string $resource = RegistrationResource::class;
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        // Ensure relationships are loaded
+        $this->record->loadMissing(['categoryTicketType.category.event', 'categoryTicketType.ticketType', 'voucherCode.voucher']);
+        return $data;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -43,8 +50,11 @@ class ViewRegistration extends EditRecord
                         ->maxLength(225)
                     ])
                 ->action(function($record, array $data){
+                    // #region agent log
+                    file_put_contents('d:\REGTIX\.cursor\debug.log', json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'B','location'=>'ViewRegistration.php:47','message'=>'Before accessing event->name','data'=>['registration_id'=>$record->id,'event_exists'=>!is_null($record->event)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
+                    // #endregion
                     $email = new EmailSender();
-                    $subject = $record->event->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
+                    $subject = $record->event?->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
                     $template = file_get_contents(resource_path('email/templates/e-ticket.html'));
                     $email->sendEmail($record, $subject, $template, $data['email_address'], $data['cc_email_address']);
 

@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Models\CategoryTicketType;
+use App\Models\Registration;
 
 
 class Event extends Model
@@ -55,7 +57,17 @@ class Event extends Model
 
     public function registrations()
     {
-        return $this->hasManyThrough(Registration::class, TicketType::class);
+        // #region agent log
+        file_put_contents('d:\REGTIX\.cursor\debug.log', json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'E','location'=>'Event.php:58','message'=>'Registrations relationship called','data'=>['event_id'=>$this->id],'timestamp'=>time()*1000])."\n", FILE_APPEND);
+        // #endregion
+        // Fixed: hasManyThrough only supports one intermediate table
+        // Correct path: Event -> Category -> CategoryTicketType -> Registration
+        // Registration has category_ticket_type_id, not ticket_type_id
+        // Original bug: used TicketType as intermediate, but Registration doesn't have ticket_type_id
+        // Solution: Use whereHas to filter registrations through the correct relationship path
+        return Registration::whereHas('categoryTicketType.category', function ($query) {
+            $query->where('event_id', $this->id);
+        });
     }
 
     public function campaigns()

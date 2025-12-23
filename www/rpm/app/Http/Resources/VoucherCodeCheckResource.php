@@ -10,17 +10,20 @@ class VoucherCodeCheckResource extends JsonResource
     public function toArray($request)
     {
         $voucher = $this->voucher;
-        $ticketType = $voucher?->categoryTicketType->ticketType;
+        // #region agent log
+        file_put_contents('d:\REGTIX\.cursor\debug.log', json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'C','location'=>'VoucherCodeCheckResource.php:13','message'=>'Before accessing categoryTicketType->ticketType','data'=>['voucher_exists'=>!is_null($voucher),'category_ticket_type_exists'=>!is_null($voucher?->categoryTicketType)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
+        // #endregion
+        $ticketType = $voucher?->categoryTicketType?->ticketType;
         $categoryTicketType = $voucher?->categoryTicketType;
         $isUsed = (bool) $this->used;
         if ($voucher) {
             $finalPrice = $voucher->final_price;
         } else {
-            $finalPrice = $categoryTicketType->price;
+            $finalPrice = $categoryTicketType?->price ?? 0;
         }
 
 
-        $categoryTicketTypeWithCount = CategoryTicketType::withCount('registrations')->find($categoryTicketType->id);
+        $categoryTicketTypeWithCount = $categoryTicketType ? CategoryTicketType::withCount('registrations')->find($categoryTicketType->id) : null;
         $used = $categoryTicketTypeWithCount?->registrations_count ?? 0;
         return [
             'code' => $this->code,
@@ -34,7 +37,7 @@ class VoucherCodeCheckResource extends JsonResource
                 'max_usage' => $voucher?->max_usage
             ],
 
-            'ticket_type' => $ticketType ? [
+            'ticket_type' => ($ticketType && $categoryTicketType) ? [
                 'id' => $ticketType->id,
                 'name' => $ticketType->name,
                 'price' => $categoryTicketType->price,

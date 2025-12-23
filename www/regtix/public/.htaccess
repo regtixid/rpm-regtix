@@ -1,0 +1,11 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Sanga sanga run redirect
+  RewriteRule ^sanga-sanga-run/?$ / [R=301,L]
+  # Jika bukan file/folder, arahkan ke index.html
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [L]
+</IfModule>
