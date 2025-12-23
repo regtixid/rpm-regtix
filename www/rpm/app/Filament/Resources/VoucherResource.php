@@ -224,12 +224,14 @@ class VoucherResource extends Resource
 
         // Admin lihat semua
         if ($user->role->name === 'superadmin') {
-            return parent::getEloquentQuery();
+            return parent::getEloquentQuery()
+                ->with(['categoryTicketType.category.event', 'categoryTicketType.ticketType']);
         }
 
         $eventIds = $user->events()->pluck('events.id')->toArray();
 
         return parent::getEloquentQuery()
+            ->with(['categoryTicketType.category.event', 'categoryTicketType.ticketType'])
             ->whereHas('categoryTicketType.category.event', function ($query) use ($eventIds) {
                 $query->whereIn('id', $eventIds);
             });

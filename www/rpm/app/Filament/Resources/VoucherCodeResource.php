@@ -89,7 +89,8 @@ class VoucherCodeResource extends Resource
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()
+            ->with(['voucher.categoryTicketType.category.event', 'voucher.categoryTicketType.ticketType']);
 
         // Filter berdasarkan user event
         if ($user->role->name !== 'superadmin') {

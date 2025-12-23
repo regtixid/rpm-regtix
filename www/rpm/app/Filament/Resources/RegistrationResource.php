@@ -481,13 +481,15 @@ class RegistrationResource extends Resource
 
         // Admin bisa lihat semua
         if ($user->role->name === 'superadmin') {
-            return parent::getEloquentQuery();
+            return parent::getEloquentQuery()
+                ->with(['categoryTicketType.category.event', 'categoryTicketType.ticketType', 'voucherCode.voucher', 'validator']);
         }
 
         // User biasa hanya lihat event tertentu
         $eventIds = $user->events()->pluck('events.id')->toArray();
 
         return parent::getEloquentQuery()
+            ->with(['categoryTicketType.category.event', 'categoryTicketType.ticketType', 'voucherCode.voucher', 'validator'])
             ->whereHas('categoryTicketType.category.event', function ($query) use ($eventIds) {
                 $query->whereIn('events.id', $eventIds);
             });

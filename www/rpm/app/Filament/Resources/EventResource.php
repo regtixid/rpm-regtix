@@ -377,11 +377,14 @@ class EventResource extends Resource
 
         // Admin lihat semua
         if ($user->role->name === 'superadmin') {
-            return parent::getEloquentQuery();
+            return parent::getEloquentQuery()
+                ->with(['categories.ticketTypes', 'categories.categoryTicketTypes']);
         }
 
         $eventIds = $user->events()->pluck('events.id')->toArray();
         // User biasa filter voucher berdasarkan event_id user
-        return parent::getEloquentQuery()->whereIn('id', $eventIds);
+        return parent::getEloquentQuery()
+            ->with(['categories.ticketTypes', 'categories.categoryTicketTypes'])
+            ->whereIn('id', $eventIds);
     }
 }
