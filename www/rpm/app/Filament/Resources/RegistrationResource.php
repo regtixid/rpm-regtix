@@ -46,14 +46,8 @@ class RegistrationResource extends Resource
 
     private static function calculateNextRegId(): string
     {
-        // #region agent log
-        file_put_contents('d:\REGTIX\.cursor\debug.log', json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'D','location'=>'RegistrationResource.php:50','message'=>'Before first() query','data'=>[],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
         // Ambil reg_id terakhir (misalnya '001', '002')
         $lastRegistration = Registration::orderByRaw('CAST(reg_id AS UNSIGNED) DESC')->first();
-        // #region agent log
-        file_put_contents('d:\REGTIX\.cursor\debug.log', json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'D','location'=>'RegistrationResource.php:52','message'=>'After first() query','data'=>['registration_exists'=>!is_null($lastRegistration),'reg_id'=>$lastRegistration?->reg_id],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
         $lastRegId = $lastRegistration?->reg_id ?? '000';
 
 
@@ -423,9 +417,6 @@ class RegistrationResource extends Resource
                             ->maxLength(225)
                         ])
                     ->action(function($record, array $data){
-                        // #region agent log
-                        file_put_contents('d:\REGTIX\.cursor\debug.log', json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'B','location'=>'RegistrationResource.php:420','message'=>'Before accessing event->name','data'=>['registration_id'=>$record->id,'event_exists'=>!is_null($record->event)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-                        // #endregion
                         $email = new EmailSender();
                         $subject = $record->event?->name . ' - Your Print-At-Home Tickets have arrived! - Do Not Reply';
                         $template = file_get_contents(resource_path('email/templates/e-ticket.html'));

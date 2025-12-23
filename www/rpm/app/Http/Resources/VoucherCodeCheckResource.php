@@ -10,9 +10,6 @@ class VoucherCodeCheckResource extends JsonResource
     public function toArray($request)
     {
         $voucher = $this->voucher;
-        // #region agent log
-        file_put_contents('d:\REGTIX\.cursor\debug.log', json_encode(['sessionId'=>'debug-session','runId'=>'run1','hypothesisId'=>'C','location'=>'VoucherCodeCheckResource.php:13','message'=>'Before accessing categoryTicketType->ticketType','data'=>['voucher_exists'=>!is_null($voucher),'category_ticket_type_exists'=>!is_null($voucher?->categoryTicketType)],'timestamp'=>time()*1000])."\n", FILE_APPEND);
-        // #endregion
         $ticketType = $voucher?->categoryTicketType?->ticketType;
         $categoryTicketType = $voucher?->categoryTicketType;
         $isUsed = (bool) $this->used;
