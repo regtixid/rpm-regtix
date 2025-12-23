@@ -48,8 +48,8 @@ class EmailCampaignController extends Controller
             );
 
             $params = [
-                'name' => $registration['full_name'],
-                'reg_id' => $registration->event->code_prefix.$registration['reg_id']
+                'name' => $registration->full_name,
+                'reg_id' => $registration->event->code_prefix.$registration->reg_id
             ];
             $sendSmtpEmail = new SendSmtpEmail([
                 'subject' => $campaign->subject,

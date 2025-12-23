@@ -29,7 +29,7 @@ class PrintController extends Controller
             $operator = $request->user(); // User yang sedang login
 
             // Get authorized event IDs for the authenticated user
-            $authorizedEventIds = $operator->events()->pluck('events.id')->toArray();
+            $authorizedEventIds = $operator->events()->pluck('id')->toArray();
             
             // Validasi pertama: Jika user tidak punya authorized events, return error
             if (empty($authorizedEventIds)) {

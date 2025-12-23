@@ -17,8 +17,8 @@ class RegistrationWidget extends BaseWidget
         $user = Auth::user();
 
         $allowedEventIds = $user->role->name === 'superadmin'
-            ? Event::where('status', 'OPEN')->pluck('events.id')->toArray() // semua event
-            : $user->events()->where('status', 'OPEN')->pluck('events.id')->toArray();
+            ? Event::where('status', 'OPEN')->pluck('id')->toArray() // semua event
+            : $user->events()->where('status', 'OPEN')->pluck('id')->toArray();
         // Ambil semua registrasi paid
         $registrations = Registration::with([
             'categoryTicketType.category',

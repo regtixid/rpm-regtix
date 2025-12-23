@@ -184,7 +184,7 @@ class UserResource extends Resource
         // User biasa filter voucher berdasarkan event_id user
         return parent::getEloquentQuery()
             ->whereHas('events', function ($query) use ($user) {
-                $query->whereIn('events.id', $user->events()->pluck('events.id'));
+                $query->whereIn('events.id', $user->events()->pluck('id'));
             });
     }
 }

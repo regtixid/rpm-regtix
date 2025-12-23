@@ -11,7 +11,7 @@ class EditEvent extends EditRecord
 {
     protected static string $resource = EventResource::class;
 
-    protected function afterCreate(): void
+    protected function afterSave(): void
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();

@@ -318,7 +318,7 @@ class RegistrationResource extends Resource
                 $user = Auth::user();
                 if (Auth::user()->role->name !== 'superadmin') {
                     // Ambil semua event id yang dimiliki user
-                    $eventIds =  $user->events()->pluck('events.id')->toArray();
+                    $eventIds =  $user->events()->pluck('id')->toArray();
                     $query->whereIn('id', $eventIds);
                 }
 
@@ -348,7 +348,7 @@ class RegistrationResource extends Resource
                     }
 
                 if ($user->role->name !== 'superadmin') {
-                    $eventIds = $user->events()->pluck('events.id')->toArray();
+                    $eventIds = $user->events()->pluck('id')->toArray();
 
                     $query->whereHas('category.event', function ($q) use ($eventIds) {
                         $q->whereIn('id', $eventIds);
@@ -486,7 +486,7 @@ class RegistrationResource extends Resource
         }
 
         // User biasa hanya lihat event tertentu
-        $eventIds = $user->events()->pluck('events.id')->toArray();
+        $eventIds = $user->events()->pluck('id')->toArray();
 
         return parent::getEloquentQuery()
             ->with(['categoryTicketType.category.event', 'categoryTicketType.ticketType', 'voucherCode.voucher', 'validator'])

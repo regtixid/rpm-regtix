@@ -26,7 +26,7 @@ class ParticipantController extends Controller
 
         // Get authorized event IDs for the authenticated user
         $user = auth()->user();
-        $authorizedEventIds = $user->events()->pluck('events.id')->toArray();
+        $authorizedEventIds = $user->events()->pluck('id')->toArray();
         
         // Validasi penting: Jika user tidak punya event yang diotorisasi, return error
         if (empty($authorizedEventIds)) {

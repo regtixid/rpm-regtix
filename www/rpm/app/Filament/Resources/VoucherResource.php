@@ -51,7 +51,7 @@ class VoucherResource extends Resource
                     $query = CategoryTicketType::query();
 
                 if ($user->role->name !== 'superadmin') {
-                    $userIds = $user->events()->pluck('events.id')->toArray();
+                    $userIds = $user->events()->pluck('id')->toArray();
                     $query->whereHas('category.event', function ($query) use ($userIds) {
                         $query->whereIn('events.id', $userIds);
                         });
@@ -177,7 +177,6 @@ class VoucherResource extends Resource
                         // Untuk multiple use — max_usage AMBIL DARI VOUCHERS
                         $record->voucherCodes()->create([
                             'code' => $code,
-                            'max_usage' => $maxUsage,
                         ]);
 
                     } else {
@@ -228,7 +227,7 @@ class VoucherResource extends Resource
                 ->with(['categoryTicketType.category.event', 'categoryTicketType.ticketType']);
         }
 
-        $eventIds = $user->events()->pluck('events.id')->toArray();
+        $eventIds = $user->events()->pluck('id')->toArray();
 
         return parent::getEloquentQuery()
             ->with(['categoryTicketType.category.event', 'categoryTicketType.ticketType'])

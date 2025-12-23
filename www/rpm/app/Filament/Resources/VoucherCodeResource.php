@@ -95,7 +95,7 @@ class VoucherCodeResource extends Resource
         // Filter berdasarkan user event
         if ($user->role->name !== 'superadmin') {
 
-            $userIds = $user->events()->pluck('events.id')->toArray();
+            $userIds = $user->events()->pluck('id')->toArray();
 
             $query->whereHas('voucher.categoryTicketType.category.event', function ($q) use ($userIds) {
                 $q->whereIn('id', $userIds);

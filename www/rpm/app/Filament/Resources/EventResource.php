@@ -86,7 +86,7 @@ class EventResource extends Resource
                 DatePicker::make('rpc_start_date')
                     ->label('RPC Start Date'),
                 DatePicker::make('rpc_end_date')
-                    ->label('RPC Start Date'),
+                    ->label('RPC End Date'),
                         TextInput::make('rpc_collection_times')
                             ->label('RPC Collection Times')
                             ->maxLength(255),
@@ -381,7 +381,7 @@ class EventResource extends Resource
                 ->with(['categories.ticketTypes', 'categories.categoryTicketTypes']);
         }
 
-        $eventIds = $user->events()->pluck('events.id')->toArray();
+        $eventIds = $user->events()->pluck('id')->toArray();
         // User biasa filter voucher berdasarkan event_id user
         return parent::getEloquentQuery()
             ->with(['categories.ticketTypes', 'categories.categoryTicketTypes'])
